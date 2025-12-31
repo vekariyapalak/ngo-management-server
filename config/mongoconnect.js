@@ -39,7 +39,7 @@ const connectMongo = async () => {
   };
   let connectionUri = appConfig.dbConnectionString;
   await mongoose.connect(connectionUri, dbOptions).catch((err) => {
-    Logger.log.fatal(`DATABASE - Error:${err}`);
+    log(`DATABASE - Error:${err}`);
   });
 };
 

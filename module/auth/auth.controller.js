@@ -4,25 +4,51 @@ import { UserModel } from "./auth.model.js";
 import httpStatus from "../../utils/httpStatus.js";
 import appConfig from "../../config/env/index.js";
 
-const userController = {};
+const authController = {};
 
-// Create User
-userController.register = async (req, res, next) => {
+// Register
+authController.register = async (req, res, next) => {
   try {
-    const isExistingUser = await UserModel.findOne({ email: req.body.email });
+    const { email, password, role, name, mobile } = req.body;
+
+    // Block ADMIN and STAFF creation
+    if (role === "ADMIN" || role === "STAFF") {
+      return res.status(httpStatus.FORBIDDEN).json({
+        message: "Cannot register as ADMIN or STAFF",
+      });
+    }
+
+    const isExistingUser = await UserModel.findOne({ email });
     if (isExistingUser) {
       return res.status(httpStatus.CONFLICT).json({
-        message: "Mail Already Exists!",
+        message: "Email already exists!",
       });
-    } else {
-      const user = new UserModel(req.body);
-      if (req.body.password) {
-        user.hash = await bcrypt.hashSync(req.body.password, 10);
-      }
-      user.password = user.hash;
-      await user.save();
-      return res.status(httpStatus.CREATED).json({ data: { user } });
     }
+
+    // Set status based on role
+    let status = "PENDING";
+    if (role === "DONOR") {
+      status = "ACTIVE";
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new UserModel({
+      name,
+      email,
+      password: hashedPassword,
+      mobile,
+      role,
+      status,
+    });
+
+    await user.save();
+
+    // Remove password from response
+    const userResponse = { ...user.toObject() };
+    delete userResponse.password;
+
+    return res.status(httpStatus.CREATED).json({ data: { user: userResponse } });
   } catch (e) {
     return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
       status: "ERROR",
@@ -31,18 +57,25 @@ userController.register = async (req, res, next) => {
   }
 };
 
-// Login user
-userController.login = async (req, res, next) => {
+// Login
+authController.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const user = await UserModel.findOne({ email: email });
-    if (user && bcrypt.compareSync(password, user.password)) {
-      const token = jwt.sign({ sub: user.id }, appConfig.jwt_key, {
+    const user = await UserModel.findOne({ email });
+    if (user && (await bcrypt.compare(password, user.password))) {
+      // Check if status is ACTIVE
+      if (user.status !== "ACTIVE") {
+        return res.status(httpStatus.UNAUTHORIZED).json({
+          message: "Account not active",
+        });
+      }
+      const token = jwt.sign({ sub: user._id }, appConfig.jwt_key, {
         expiresIn: "7d",
       });
       return res.status(httpStatus.OK).json({
         message: "Auth successful",
         token: token,
+        role: user.role,
       });
     } else {
       return res.status(httpStatus.UNAUTHORIZED).json({
@@ -57,65 +90,58 @@ userController.login = async (req, res, next) => {
   }
 };
 
-// Get All Users
-userController.findAll = async (req, res) => {
-  try {
-    let users = await UserModel.find();
-    return res.json(users);
-  } catch (error) {
-    return res
-      .status(httpStatus.INTERNAL_SERVER_ERROR)
-      .json({ error: error.toString() });
-  }
-};
+const ADMIN_KEY = "supersecretadmin123"; // Static password for creating ADMIN/STAFF
 
-// Get User By ID
-userController.findOne = async (req, res) => {
+// Register Admin or Staff with key
+authController.registerAdminStaff = async (req, res, next) => {
   try {
-    let user = await UserModel.findById(req.params.userId);
-    if (!user) {
-      return res
-        .status(httpStatus.BAD_REQUEST)
-        .json({ message: "User not found" });
-    }
-    return res.json(user);
-  } catch (error) {
-    return res
-      .status(httpStatus.INTERNAL_SERVER_ERROR)
-      .json({ error: error.toString() });
-  }
-};
+    const { email, password, role, name, mobile, adminKey } = req.body;
 
-// Update User By ID
-userController.update = async (req, res) => {
-  try {
-    let user = await UserModel.findById(req.params.userId);
-    if (!user) {
-      return res
-        .status(httpStatus.BAD_REQUEST)
-        .json({ message: "User not found" });
+    // Check static key
+    if (adminKey !== ADMIN_KEY) {
+      return res.status(httpStatus.FORBIDDEN).json({
+        message: "Invalid admin key",
+      });
     }
-    Object.assign(user, req.body);
+
+    // Allow only ADMIN or STAFF
+    if (role !== "ADMIN" && role !== "STAFF") {
+      return res.status(httpStatus.BAD_REQUEST).json({
+        message: "Role must be ADMIN or STAFF",
+      });
+    }
+
+    const isExistingUser = await UserModel.findOne({ email });
+    if (isExistingUser) {
+      return res.status(httpStatus.CONFLICT).json({
+        message: "Email already exists!",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new UserModel({
+      name,
+      email,
+      password: hashedPassword,
+      mobile,
+      role,
+      status: "ACTIVE", // Always ACTIVE for ADMIN/STAFF
+    });
+
     await user.save();
-    return res.json(user);
-  } catch (error) {
-    return res.status(500).json({ error: error.toString() });
+
+    // Remove password from response
+    const userResponse = { ...user.toObject() };
+    delete userResponse.password;
+
+    return res.status(httpStatus.CREATED).json({ data: { user: userResponse } });
+  } catch (e) {
+    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      status: "ERROR",
+      message: e.message,
+    });
   }
 };
 
-// Delete User By ID
-userController.delete = async (req, res) => {
-  try {
-    let user = await UserModel.findByIdAndRemove(req.params.userId);
-    if (!user) {
-      return res
-        .status(httpStatus.BAD_REQUEST)
-        .json({ message: "User not found" });
-    }
-    return res.json({ message: "User deleted successfully!" });
-  } catch (error) {
-    return res.status(500).json({ error: error.toString() });
-  }
-};
-
-export default userController;
+export default authController;

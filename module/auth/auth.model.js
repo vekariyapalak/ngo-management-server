@@ -3,43 +3,36 @@ import mongoose from "mongoose";
 const schema = mongoose.Schema;
 
 const userSchema = new schema({
-  firstName: {
-    type: String,
-    required: true,
-  },
-  lastName: {
-    type: String,
-    required: true,
-  },
-  address: {
+  name: {
     type: String,
     required: true,
   },
   email: {
     type: String,
     required: true,
-  },
-  country: {
-    type: String,
-    required: true,
-  },
-  phone: {
-    type: Number,
-    required: true,
+    unique: true,
   },
   password: {
     type: String,
     required: true,
   },
-  role:{
+  mobile: {
     type: String,
     required: true,
-    enum: ['ADMIN', 'STAFF', 'VOLUNTEER', 'DONOR']
+  },
+  role: {
+    type: String,
+    required: true,
+    enum: ["ADMIN", "STAFF", "VOLUNTEER", "DONOR"],
   },
   status: {
     type: String,
     enum: ["PENDING", "ACTIVE", "REJECTED"],
-    default: "PENDING"
+    default: "PENDING",
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
   },
 });
 
