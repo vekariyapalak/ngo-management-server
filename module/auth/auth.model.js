@@ -20,6 +20,10 @@ const userSchema = new schema({
     type: String,
     required: true,
   },
+  address: {
+    type: String,
+    required: false,
+  },
   role: {
     type: String,
     required: true,
@@ -29,6 +33,14 @@ const userSchema = new schema({
     type: String,
     enum: ["PENDING", "ACTIVE", "REJECTED"],
     default: "PENDING",
+  },
+  skills: {
+    type: [String],
+    required: false,
+  },
+  availability: {
+    type: String,
+    required: false,
   },
   createdAt: {
     type: Date,

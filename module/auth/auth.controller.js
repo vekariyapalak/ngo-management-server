@@ -9,13 +9,22 @@ const authController = {};
 // Register
 authController.register = async (req, res, next) => {
   try {
-    const { email, password, role, name, mobile } = req.body;
+    const { email, password, role, name, mobile, address, skills, availability } = req.body;
 
     // Block ADMIN and STAFF creation
     if (role === "ADMIN" || role === "STAFF") {
       return res.status(httpStatus.FORBIDDEN).json({
         message: "Cannot register as ADMIN or STAFF",
       });
+    }
+
+    // Validate required fields for volunteers
+    if (role === "VOLUNTEER") {
+      if (!skills || !availability) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          message: "Skills and availability are required for volunteers",
+        });
+      }
     }
 
     const isExistingUser = await UserModel.findOne({ email });
@@ -38,8 +47,11 @@ authController.register = async (req, res, next) => {
       email,
       password: hashedPassword,
       mobile,
+      address,
       role,
       status,
+      skills: role === "VOLUNTEER" ? skills : undefined,
+      availability: role === "VOLUNTEER" ? availability : undefined,
     });
 
     await user.save();
@@ -62,6 +74,7 @@ authController.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const user = await UserModel.findOne({ email });
+    console.log("User found:", user);
     if (user && (await bcrypt.compare(password, user.password))) {
       // Check if status is ACTIVE
       if (user.status !== "ACTIVE") {
