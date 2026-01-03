@@ -10,8 +10,8 @@
     "build": "pnpm exec esbuild app.js --bundle --outfile=dist/app.js --platform=node",
     "clean": "rimraf dist",
     "server": "cross-env DEBUG=app nodemon --es-module-specifier-resolution=node app.js",
-    "dev": "cross-env NODE_ENV=development pnpm run-all server",
-    "prod": "pnpm-run-all clean build",
+    "dev": "cross-env NODE_ENV=development pnpm run server",
+    "prod": "run-s clean build",
     "format": "prettier --write \"./**/*.js\""
   },
   "keywords": [],
